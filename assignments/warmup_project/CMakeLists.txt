@@ -5,12 +5,14 @@ project(warmup_project)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  actionlib
-  actionlib_msgs
   message_generation
   roscpp
   rospy
   std_msgs
+  sensor_msgs
+  geometry_msgs
+  nav_msgs
+  OpenCV
 )
 
 ## System dependencies are found with CMake's conventions
@@ -85,7 +87,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES warmup_project
-#  CATKIN_DEPENDS actionlib actionlib_msgs message_generation roscpp rospy std_msgs
+ CATKIN_DEPENDS roscpp
 #  DEPENDS system_lib
 )
 
@@ -96,26 +98,24 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
-
-## Declare a cpp library
-# add_library(warmup_project
-#   src/${PROJECT_NAME}/warmup_project.cpp
+# include_directories(
+#   ${catkin_INCLUDE_DIRS}
 # )
 
+## Declare a cpp library
+# add_library(laser_imaging src/laser_imaging.cpp)
+
 ## Declare a cpp executable
-# add_executable(warmup_project_node src/warmup_project_node.cpp)
+add_executable(wall_detection src/wall_detection.cpp)
+# add_executable(laser_imaging_node src/laser_imaging_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(warmup_project_node warmup_project_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(warmup_project_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(wall_detection ${catkin_LIBRARIES})
+# target_link_libraries(wall_detection laser_imaging ${catkin_LIBRARIES})
 
 #############
 ## Install ##

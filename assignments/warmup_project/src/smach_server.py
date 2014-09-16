@@ -14,6 +14,7 @@
 import rospy
 import smach
 import smach_ros
+from geometry_msgs.msg import Twist, Vector3
 
 from neato_classes import NeatoFollower
 neato = NeatoFollower()
@@ -87,8 +88,6 @@ class Avoid(smach.State):
         global neato
         rospy.loginfo('Executing state AVOID')
 
-        neato.movement_detected = False
-        
         self.result = 'finished'
         rospy.loginfo("AVOID state is returning %s\n", self.result)
         return self.result
@@ -104,15 +103,23 @@ class Idle(smach.State):
         global neato
         rospy.loginfo('Executing state IDLE')
 
-        rospy.sleep(1.0)
+        rospy.logdebug('neato.movement_detected: %s', neato.movement_detected)
+        rospy.logdebug('neato.wall_detected: %s\n', neato.wall_detected)
+        r = rospy.Rate(5)
 
-        if neato.movement_detected:
-            self.result = 'preempt-avoid'
-        elif neato.wall_detected:
-            self.result = 'preempt-follow'
-        else:
-            # pass
-            self.result = 'finished'
+        while not rospy.is_shutdown():
+            if neato.movement_detected:
+                self.result = 'preempt-avoid'
+                break
+            elif neato.wall_detected:
+                self.result = 'preempt-follow'
+                break
+            else:
+                pass
+                v = Vector3()
+                neato.command_motors(v)
+                r.sleep()
+
         rospy.loginfo("IDLE state is returning %s\n", self.result)
         return self.result
 
@@ -123,7 +130,10 @@ def main():
     # Create a SMACH state machine
     sm = smach.StateMachine(outcomes=['sm-finished']) #,
                             # input_keys=['sm_robot'])
-    sm.userdata.sm_robot = NeatoFollower()
+    try:
+        sm.userdata.sm_robot = NeatoFollower()
+    except rospy.ROSInterruptException as e:
+        rospy.logerr("Error! %s", e)
 
     # Open the container
     with sm:
@@ -131,8 +141,8 @@ def main():
         smach.StateMachine.add('IDLE', Idle(), 
                                 transitions={'preempt-avoid':'AVOID',
                                             'preempt-follow':'FIND',
-                                            'finished':'WARY'},
-                                            # 'finished':'sm-finished'},
+                                            # 'finished':'WARY'},
+                                            'finished':'sm-finished'},
                                 remapping={'idle_robot':'sm_robot'})
         smach.StateMachine.add('WARY', Wary(), 
                                 transitions={'alarm':'AVOID',
@@ -151,15 +161,15 @@ def main():
                                 remapping={'follow_robot':'sm_robot'})
 
     # Add introspection
-    sis = smach_ros.IntrospectionServer('view_smach', sm, '/SM_ROOT')
-    sis.start() 
+    # sis = smach_ros.IntrospectionServer('view_smach', sm, '/SM_ROOT')
+    # sis.start() 
 
     # Execute SMACH plan
     outcome = sm.execute()
 
     # Wait for script to end (cntl-c)
     rospy.spin()
-    sis.stop()
+    # sis.stop()
 
 
 if __name__ == '__main__':
