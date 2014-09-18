@@ -64,6 +64,7 @@ void laser_to_image(const sensor_msgs::LaserScanConstPtr& msg) {
   float ang;  float dist;
   int x_pix;  int y_pix;
 
+  ROS_INFO("Got to image-builfing loop");
   for (int i = 0; i < num_points; i++) {
     // The angle offset is to account for North = 0
     ang = (i * CV_PI / 180) + (CV_PI / 2);
@@ -81,6 +82,7 @@ void laser_to_image(const sensor_msgs::LaserScanConstPtr& msg) {
       }
     }
   }
+  ROS_INFO("Got past image-building loop");
 
   cv::Mat blk(edge_len, edge_len, CV_8UC1, &data);
   // cv::imshow("Black and white", blk);
@@ -100,14 +102,17 @@ bool detect_walls(cv::Mat blk) {
         cv::Scalar(0, 255, 0), 4, CV_AA);
   cv::line(clr, cv::Point(cen_x, cen_y - k), cv::Point(cen_x - k, cen_y + k),
         cv::Scalar(0, 255, 0), 4, CV_AA);
+  ROS_INFO("Drew the bot");
 
   // Detect lines in the image
   std::vector<cv::Vec4i> lines;
   // src, lines, res (pix), res (rad), points_in_line, minLinLength, maxLineGap
   cv::HoughLinesP(blk, lines, 1, CV_PI/180, 50, 100, 80);
   ROS_INFO("\tNumber of lines detected: %d", lines.size());
+  ROS_INFO("Did the Hough transform");
 
   std::vector<float> ang, length, nearest_dist;
+  bool behind_bot[lines.size()];
   ang.assign(lines.size(), 0.0);
   length.assign(lines.size(), 0.0);
   nearest_dist.assign(lines.size(), 0.0);
@@ -130,28 +135,37 @@ bool detect_walls(cv::Mat blk) {
                         / pix_per_m;
 
     // Find the shortest distance from robot to wall
-    float m = (-l[3] + l[1]) / (static_cast<float> l[2] - l[0]);
+    float m = (-l[3] + l[1]) / static_cast<float> (l[2] - l[0]);
     // y-intercept is b = y - mx (again, negated b/c y is flipped in images)
-    float by = -l[1] - m*l[0];
+    float b = -l[1] - m*l[0];
     // equation found here:
     //      math.ucsd.edu/~wgarner/math4c/derivations/distance/distptline.htm
     // This assumes the bot is in the center of the picture
-    nearest_dist.at(i) = abs(-cen_y - m * cen_x - by)
+    nearest_dist.at(i) = abs(-cen_y - m * cen_x - b)
                           / (static_cast<float> (pow(pow(m, 2) + 1, 0.5)
                           * pix_per_m));
+
+    // Find whether the wall crosses in front of or behind the robot
+    // The negative sign on cen_y is b/c y is flipped
+    if (m*cen_x + b < -cen_y)
+      behind_bot[i] = true;
+    else
+      behind_bot[i] = false;
 
     // Plot debug messages
     // ROS_INFO("\tline %d - angle: %f", i, ang.at(i));
     // ROS_INFO("\tline %d - length (m): %f", i, length.at(i));
     // ROS_INFO("\tline %d - slope: %f", i, m);
-    // ROS_INFO("\tline %d - y intercept: %f", i, by);
+    // ROS_INFO("\tline %d - y intercept: %f", i, b);
     // ROS_INFO("\tline %d - nearest_dist (m): %f", i, nearest_dist.at(i));
+    ROS_INFO("\tDoes wall cross behind robot? %d", behind_bot[i]);
 
     if (length.at(i) > max_len) {
       max_len = length.at(i);
       max_i = i;
     }
   }
+  ROS_INFO("Calculated all the useful data");
 
   cv::imshow("Added lines", clr);
   cv::waitKey(10);
@@ -160,8 +174,12 @@ bool detect_walls(cv::Mat blk) {
     // TODO(fschneider): Right now this only publishes the longest wall,
     // could be smarter
     geometry_msgs::Twist wall;
-    wall.linear.x = cos(ang.at(max_i)) * nearest_dist.at(max_i);
-    wall.linear.y = sin(ang.at(max_i)) * nearest_dist.at(max_i);
+
+    int sign = 1;
+    if (behind_bot[max_i])
+      sign = -1;
+    wall.linear.x = sign * cos(ang.at(max_i)) * nearest_dist.at(max_i);
+    wall.linear.y = sign *sin(ang.at(max_i)) * nearest_dist.at(max_i);
     if (ang.at(max_i) < 0.0)
       wall.angular.z = ang.at(max_i) + CV_PI / 2.0;
     else
@@ -171,4 +189,5 @@ bool detect_walls(cv::Mat blk) {
   } else {
     return false;
   }
+  ROS_INFO("Returned all the useful data");
 }

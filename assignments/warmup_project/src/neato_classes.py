@@ -23,11 +23,11 @@ class NeatoFollower():
     def __init__(self):
         rospy.init_node('NeatoFollower')
 
-        self.max_linear = 0.075
-        # self.max_linear = 0.3
+        # self.max_linear = 0.075
+        self.max_linear = 0.3
         self.min_linear = 0.0
-        self.max_angular = 0.25
-        # self.max_angular = 1
+        # self.max_angular = 0.25
+        self.max_angular = 1
         self.min_angular = 0.0
 
         self.last_scan = LaserScan()
@@ -51,7 +51,7 @@ class NeatoFollower():
         self.goal_distance = 0.8
         # Coordinates and angle of closest wall
         self.closest_wall = Twist()
-        self.last_wall_detection = rospy.get_rostime()
+        self.last_wall_detection = rospy.get_time()
         # Seconds w/o wall detection before wall_detected gets set to false
         self.wall_timeout = 1.0
 
@@ -77,7 +77,8 @@ class NeatoFollower():
             self.odom_hist.pop(0)
 
         self.detect_movement()
-        if (rospy.get_rostime() - self.last_wall_detection) > self.wall_timeout:
+
+        if (rospy.get_time() - self.last_wall_detection) > self.wall_timeout:
             self.wall_detected = False
 
     def odom_callback(self, msg):
@@ -89,7 +90,7 @@ class NeatoFollower():
 
     def detect_walls(self, msg):
         self.wall_detected = True
-        self.last_wall_detection = rospy.get_rostime()
+        self.last_wall_detection = rospy.get_time()
         self.closest_wall = deepcopy(msg)
 
     # Takes the laser scan and creates a dictionary of the valid points, with
@@ -132,7 +133,7 @@ class NeatoFollower():
 
     def command_motors(self, cmd_vector):
         avoid_vector = self.obstacle_avoid()
-        # self.drive(Vector3(-1.0, 1, 0))
+        self.drive(Vector3(-1.0, 1, 0))
         if vector_mag(avoid_vector) < self.avoid_cutoff\
                 and vector_mag(cmd_vector) > self.cmd_cutoff:
             self.drive(cmd_vector)
@@ -159,8 +160,8 @@ class NeatoFollower():
             reaction = self.obstacle_sensitivity - points[point]
             if reaction > max_reaction:
                 max_reaction = reaction
-            unit_vector = [cos((point + 90) * (pi / 180.0)),
-                           sin((point + 90) * (pi / 180.0))]
+            unit_vector = [cos(point * (pi / 180.0)),
+                           sin(point * (pi / 180.0))]
             x_val = max(reaction, 0.0) * -unit_vector[0]
             y_val = max(reaction, 0.0) * -unit_vector[1]
             v = vector_add(v, Vector3(x_val, y_val, 0.0))
@@ -219,11 +220,14 @@ def vector_mag(v):
 # Asngle assumes 2D vector, returns in degrees
 # Vertical (0, 1) is an angle of 0, sweeps (+/-) going (CCW/CW)
 def vector_ang(v):
-    ang = -atan2(v.x, v.y)
+    ang = -atan2(-v.y, v.x)
     return ang * (180 / pi)
 
 def create_unit_vector(v1):
     v = Vector3()
-    v.x = v1.x / vector_mag(v1)
-    v.y = v1.y / vector_mag(v1)
+    if vector_mag(v1) == 0:
+        v.x = 1.0
+    else:
+        v.x = v1.x / vector_mag(v1)
+        v.y = v1.y / vector_mag(v1)
     return v

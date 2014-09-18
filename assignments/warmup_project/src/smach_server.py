@@ -62,12 +62,12 @@ class Follow(smach.State):
             wall = deepcopy(neato.closest_wall)
 
             cmd_align.x = cos(wall.angular.z)
-            cmd_align.y = -sin(wall.angular.z)
+            cmd_align.y = sin(wall.angular.z)
             error = vector_mag(wall.linear) - neato.goal_distance
             cmd_approach = vector_multiply(create_unit_vector(wall.linear),
                                             error)
-            rospy.loginfo("cmd_align: \n%s", cmd_align)
-            rospy.loginfo("cmd_approach: \n%s", cmd_approach)
+            # rospy.loginfo("cmd_align: \n%s", cmd_align)
+            # rospy.loginfo("cmd_approach: \n%s", cmd_approach)
 
             neato.command_motors(vector_add(cmd_align, cmd_approach))
             r.sleep()
