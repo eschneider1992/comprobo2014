@@ -146,7 +146,7 @@ class xv11():
         # turn things on
         time.sleep(2)
         #print self.port.recv(16384)
-        time.sleep(5)
+        time.sleep(2)
         self.setTestMode("on")
         time.sleep(2)
         self.setLDS("on")
@@ -177,10 +177,16 @@ class xv11():
         #return (ranges,intensities)
         if len(ranges) == 0:
             return (ranges,intensities)
+        # filter out lone detections
         for i in range(len(ranges)):
             previous = (i-1)%len(ranges)
             next = (i+1)%len(ranges)
             if (ranges[previous] == 0 and ranges[next] == 0) or intensities[i] < 10:
+                ranges[i] = 0.0
+                intensities[i] = 0.0
+        # filter out ranges that are too long or too short
+        for i in range(len(ranges)):
+            if ranges[i] < .2 or ranges[i] > 5.0:
                 ranges[i] = 0.0
                 intensities[i] = 0.0
         return (ranges,intensities)
