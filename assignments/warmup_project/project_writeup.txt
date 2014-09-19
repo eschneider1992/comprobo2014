@@ -1,0 +1,23 @@
+Which behaviors did you implement?
+	I implemented Obstacle Avoid and Wall Following
+
+For each behavior, what strategy did you use to implement the behavior? 
+	For O.A., I made a vector directly away from every point (strength dependent on how close it was) that was sensed and summed those vectors, then scaled the magnitude of the summed vector by the closest point. The closer the closest point, the stronger the resistive force applied by O.A. Points outside of a variable defined range I ignored completely.
+	For W.F., I turned the laser data into a pixelized image format, did the Hough transform on that, and then commanded the robot with the average of two vectors - one (approach) that would put the robot at the desired distance from the wall and two (align) that tries to turn the robot to align with the wall
+
+For the finite state controller, which behaviors did you combine and how did you detect when to transition between behaviors?
+	W.F. kicks in when a wall is detected and no obstacle is detected
+	O.A. kicks in when an obstacle within the specified range is found
+
+How did you structure your code?
+	First, I made NeatoFollower a class with many useful variables. Then I made a smach server that would flip between states based on class state data and use class commands to do stuff.
+	I also made a wall_detection in C++ that outputs a sensed wall as a Twist vector for other nodes to use. It's surprisingly accurate at measuring closest distance to wall and orientation of wall.
+
+What if any challenges did you face along the way?
+	I needed to learn smach, that was new, then I needed to spend a lot of time on wall detection. No big probelms other than development challenges.
+
+What would you do to improve your project if you had more time?
+	I have a 'buglists.txt' file in the same directory as this writeup with more information, but I'd like to get corner turning happening better. I didn't care enough to do it well here.
+
+Did you learn any interesting lessons for future robotic programming projects?
+	smach was interesting and made iteration/rapid changes nice. I'm going to reuse the wall detection code, that was good.
