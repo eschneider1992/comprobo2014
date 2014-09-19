@@ -23,12 +23,22 @@ class NeatoFollower():
     def __init__(self):
         rospy.init_node('NeatoFollower')
 
+        self.goal_distance = 1
+        # At 0.5 meters, the sensitivity will be zero
+        self.obstacle_sensitivity = 0.6
+        self.avoid_scale = 4
+
         # self.max_linear = 0.075
         self.max_linear = 0.3
         self.min_linear = 0.0
         # self.max_angular = 0.25
-        self.max_angular = 1
+        # self.max_angular = 0.35
+        self.max_angular = 2
         self.min_angular = 0.0
+        self.drive_commands = {"Right": Vector3(1, -1, 0),
+                               "Left": Vector3(1, 1, 0),
+                               "Forward": Vector3(1, 0, 0),
+                               "Back": Vector3(-1, 0, 0)}
 
         self.last_scan = LaserScan()
         self.scan_hist = []
@@ -48,20 +58,19 @@ class NeatoFollower():
         # Has a wall been detected?
         self.wall_detected = False
         # Goal distance in meters
-        self.goal_distance = 0.8
         # Coordinates and angle of closest wall
         self.closest_wall = Twist()
         self.last_wall_detection = rospy.get_time()
         # Seconds w/o wall detection before wall_detected gets set to false
-        self.wall_timeout = 1.0
+        self.wall_timeout = 0.5
+        self.last_wall_left = True
 
-        # At 0.5 meters, the sensitivity will be zero
-        self.obstacle_sensitivity = 0.5
         # Cutoff magnitudes below which no drive command will be published
         self.cmd_cutoff = 0.01
         self.avoid_cutoff = 0.1
 
-        self.laser_sub = rospy.Subscriber('/scan', LaserScan, self.laser_callback)
+        self.laser_sub = rospy.Subscriber('/scan', LaserScan,
+                                          self.laser_callback)
         self.wall_sub = rospy.Subscriber('/detected_walls', Twist,
                                          self.detect_walls)
         self.vel_pub = rospy.Publisher('/cmd_vel', Twist)
@@ -89,9 +98,17 @@ class NeatoFollower():
         self.movement_detected = False
 
     def detect_walls(self, msg):
-        self.wall_detected = True
-        self.last_wall_detection = rospy.get_time()
-        self.closest_wall = deepcopy(msg)
+        if not (msg.linear.x == 0 and msg.linear.y == 0):
+            self.wall_detected = True
+            self.closest_wall = deepcopy(msg)
+            self.last_wall_detection = rospy.get_time()
+            # rospy.loginfo("Recieved wall: %s", str(self.closest_wall))
+            if self.closest_wall.linear.y > 0.0:
+                self.last_wall_left = True
+            else:
+                self.last_wall_left = False
+            # rospy.loginfo("\tIs wall left?: %s", str(self.last_wall_left))
+            # rospy.loginfo("\tWhat is the y value?: %f", msg.linear.y)
 
     # Takes the laser scan and creates a dictionary of the valid points, with
     # degree = key and value = value
@@ -145,6 +162,7 @@ class NeatoFollower():
         elif vector_mag(cmd_vector) < self.cmd_cutoff\
                 and vector_mag(avoid_vector) < self.avoid_cutoff:
             # rospy.loginfo("No input, no msg published")
+            self.stop()
             pass
         else:
             self.drive(vector_add(cmd_vector, avoid_vector))
@@ -165,9 +183,10 @@ class NeatoFollower():
             x_val = max(reaction, 0.0) * -unit_vector[0]
             y_val = max(reaction, 0.0) * -unit_vector[1]
             v = vector_add(v, Vector3(x_val, y_val, 0.0))
-        
+
         if max([abs(v.x), abs(v.y)]) > 0:
-            v = vector_multiply(v, max_reaction / max([abs(v.x), abs(v.y)]))
+            v = vector_multiply(v, self.avoid_scale * max_reaction
+                                / max([abs(v.x), abs(v.y)]))
         else:
             v = Vector3()
         return v
@@ -186,7 +205,7 @@ class NeatoFollower():
             cmd.linear.x = self.min_linear
         else:
             # Linear fit, 2.0x at 0, 1.0x at 45 and 0.0x at 90 degrees
-            cmd.linear.x = (1 - ((abs(ang) - max_speed_angle)\
+            cmd.linear.x = (1 - ((abs(ang) - max_speed_angle)
                             / max_speed_angle)) * self.max_linear
             cmd.linear.x = min(cmd.linear.x, self.max_linear)
 
@@ -206,6 +225,7 @@ def vector_add(v1, v2):
     v.z = (v1.z + v2.z)
     return v
 
+
 def vector_multiply(v1, scalar):
     v = Vector3()
     v.x = v1.x * scalar
@@ -213,15 +233,18 @@ def vector_multiply(v1, scalar):
     v.z = v1.z * scalar
     return v
 
+
 def vector_mag(v):
     mag = pow(pow(v.x, 2) + pow(v.y, 2) + pow(v.z, 2), 0.5)
     return mag
+
 
 # Asngle assumes 2D vector, returns in degrees
 # Vertical (0, 1) is an angle of 0, sweeps (+/-) going (CCW/CW)
 def vector_ang(v):
     ang = -atan2(-v.y, v.x)
     return ang * (180 / pi)
+
 
 def create_unit_vector(v1):
     v = Vector3()

@@ -1,0 +1,5 @@
+Buglist:
+	Robot waves towards and away from the wall
+	The obstacle avoid circle is centered on the lidar, which is set back on the bot, making it do crappy obstacle in front of it for small circles
+	Occasionally the smach_server has a dictionary change size in FOLLOW as it's being used
+	I implemented a basic corner turner after losing the wall, but it doesn't work smoothly

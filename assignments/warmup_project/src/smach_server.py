@@ -2,9 +2,9 @@
 
 # Written by Eric Schneider for the CompRobo warmup project
 # 9/14/2014
-# 
+#
 # Stuff about how it works...
-# 
+#
 # In the code below I couldn't get the input_keys methods to apprpriately
 # pass a class object. The sm_robot class was either not passed into the
 # states, or it was passed as a constant. I left the code in there for
@@ -24,7 +24,8 @@ neato = NeatoFollower()
 # define state Find
 # class Find(smach.State):
 #     def __init__(self):
-#         smach.State.__init__(self, outcomes=['preempt-avoid', 'finished'], input_keys=['find_robot'])
+#         smach.State.__init__(self, outcomes=['preempt-avoid',
+#                              'finished'], input_keys=['find_robot'])
 #         self.result = ''
 
 #     def execute(self, userdata):
@@ -35,7 +36,7 @@ neato = NeatoFollower()
 #             self.result = 'preempt-avoid'
 #         else:
 #             self.result = 'finished'
-        
+
 #         rospy.loginfo("FIND state is returning %s\n", self.result)
 #         return self.result
 
@@ -43,13 +44,14 @@ neato = NeatoFollower()
 # define state Follow
 class Follow(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['preempt-avoid', 'finished'], input_keys=['follow_robot'])
+        smach.State.__init__(self, outcomes=['preempt-avoid', 'finished'],
+                             input_keys=['follow_robot'])
         self.result = ''
 
     def execute(self, userdata):
         global neato
         rospy.loginfo('Executing state FOLLOW')
-        
+
         cmd_align = Vector3()
         cmd_approach = Vector3()
         wall = Twist()
@@ -65,7 +67,7 @@ class Follow(smach.State):
             cmd_align.y = sin(wall.angular.z)
             error = vector_mag(wall.linear) - neato.goal_distance
             cmd_approach = vector_multiply(create_unit_vector(wall.linear),
-                                            error)
+                                           error)
             # rospy.loginfo("cmd_align: \n%s", cmd_align)
             # rospy.loginfo("cmd_approach: \n%s", cmd_approach)
 
@@ -78,10 +80,43 @@ class Follow(smach.State):
         return self.result
 
 
+# define state Follow
+class SeekWall(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['preempt-avoid', 'finished'],
+                             input_keys=['follow_robot'])
+        self.result = ''
+
+    def execute(self, userdata):
+        global neato
+        rospy.loginfo('Executing state SEEK_WALL')
+
+        if neato.movement_detected:
+            self.result = 'preempt-avoid'
+            return
+
+        if neato.last_wall_left:
+            cmd = "Left"
+        else:
+            cmd = "Right"
+        neato.command_motors(neato.drive_commands[cmd])
+        rospy.loginfo("Sending bot seeking to the %s", cmd)
+        rospy.sleep(1.0)
+        neato.command_motors(neato.drive_commands["Forward"])
+        rospy.sleep(0.5)
+        neato.stop()
+
+        self.result = 'finished'
+        rospy.loginfo("SEEK_WALL state is returning %s\n", self.result)
+        neato.stop()
+        return self.result
+
+
 # define state Wary
 class Wary(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['alarm', 'false-alarm'], input_keys=['wary_robot'])
+        smach.State.__init__(self, outcomes=['alarm', 'false-alarm'],
+                             input_keys=['wary_robot'])
         self.result = ''
 
     def execute(self, userdata):
@@ -145,6 +180,7 @@ class Idle(smach.State):
         rospy.loginfo("IDLE state is returning %s\n", self.result)
         return self.result
 
+
 # main
 def main():
     # Unnecessary b/c NeatoFollower() calls init_node
@@ -152,8 +188,9 @@ def main():
     # rospy.sleep(0.5)
 
     # Create a SMACH state machine
-    sm = smach.StateMachine(outcomes=['sm-finished']) #,
-                            # input_keys=['sm_robot'])
+    sm = smach.StateMachine(outcomes=['sm-finished'])
+    #, input_keys=['sm_robot'])
+
     try:
         sm.userdata.sm_robot = NeatoFollower()
     except rospy.ROSInterruptException as e:
@@ -162,31 +199,35 @@ def main():
     # Open the container
     with sm:
         # Add states to the container
-        smach.StateMachine.add('IDLE', Idle(), 
-                                transitions={'preempt-avoid':'AVOID',
-                                            'preempt-follow':'FOLLOW',
-                                            # 'finished':'WARY'},
-                                            'finished':'sm-finished'},
-                                remapping={'idle_robot':'sm_robot'})
-        smach.StateMachine.add('WARY', Wary(), 
-                                transitions={'alarm':'AVOID',
-                                            'false-alarm':'IDLE'},
-                                remapping={'wary_robot':'sm_robot'})
-        smach.StateMachine.add('AVOID', Avoid(), 
-                               transitions={'finished':'IDLE'},
-                               remapping={'avoid_robot':'sm_robot'})
-        # smach.StateMachine.add('FIND', Find(), 
-        #                        transitions={'preempt-avoid':'AVOID', 
-        #                                     'finished':'FOLLOW'},
-        #                         remapping={'find_robot':'sm_robot'})
-        smach.StateMachine.add('FOLLOW', Follow(), 
-                               transitions={'preempt-avoid':'AVOID', 
-                                            'finished':'IDLE'},
-                                remapping={'follow_robot':'sm_robot'})
+        smach.StateMachine.add('IDLE', Idle(),
+                               transitions={'preempt-avoid': 'AVOID',
+                                            'preempt-follow': 'FOLLOW',
+                                            'finished': 'sm-finished'},
+                               remapping={'idle_robot': 'sm_robot'})
+        smach.StateMachine.add('WARY', Wary(),
+                               transitions={'alarm': 'AVOID',
+                                            'false-alarm': 'IDLE'},
+                               remapping={'wary_robot': 'sm_robot'})
+        smach.StateMachine.add('AVOID', Avoid(),
+                               transitions={'finished': 'IDLE'},
+                               remapping={'avoid_robot': 'sm_robot'})
+        # smach.StateMachine.add('FIND', Find(),
+        #                        transitions={'preempt-avoid': 'AVOID',
+        #                                     'finished': 'FOLLOW'},
+        #                         remapping={'find_robot': 'sm_robot'})
+        smach.StateMachine.add('FOLLOW', Follow(),
+                               transitions={'preempt-avoid': 'AVOID',
+                                            'finished': 'SEEK_WALL'},
+                               remapping={'follow_robot': 'sm_robot'})
+        smach.StateMachine.add('SEEK_WALL', SeekWall(),
+                               transitions={'preempt-avoid': 'AVOID',
+                                            'finished': 'IDLE'},
+                               remapping={'follow_robot': 'sm_robot'})
+
 
     # Add introspection
     # sis = smach_ros.IntrospectionServer('view_smach', sm, '/SM_ROOT')
-    # sis.start() 
+    # sis.start()
 
     # Execute SMACH plan
     outcome = sm.execute()

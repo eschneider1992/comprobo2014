@@ -56,7 +56,11 @@ int main(int argc, char** argv) {
 }
 
 void laser_to_image(const sensor_msgs::LaserScanConstPtr& msg) {
+  if (msg == 0) {
+    return;
+  }
   ROS_INFO("Starting laser to image conversion");
+
   uint8_t data[edge_len * edge_len];
   for (int i = 0; i < (edge_len * edge_len); i++)
     data[i] = 0.0;
@@ -64,7 +68,6 @@ void laser_to_image(const sensor_msgs::LaserScanConstPtr& msg) {
   float ang;  float dist;
   int x_pix;  int y_pix;
 
-  ROS_INFO("Got to image-builfing loop");
   for (int i = 0; i < num_points; i++) {
     // The angle offset is to account for North = 0
     ang = (i * CV_PI / 180) + (CV_PI / 2);
@@ -76,13 +79,12 @@ void laser_to_image(const sensor_msgs::LaserScanConstPtr& msg) {
           || y_pix + point_radius > edge_len || y_pix - point_radius < 0) {
         ROS_INFO("cv::Point dropped, it was on an edge");
       } else {
-        for (int x = -point_radius; x <= point_radius; x++)
-          for (int y = -point_radius; y <= point_radius; y++)
-            data[((edge_len - (y_pix + y)) * edge_len + (x_pix + x))] = 255;
+        for (int dx = -point_radius; dx <= point_radius; dx++)
+          for (int dy = -point_radius; dy <= point_radius; dy++)
+            data[((edge_len - (y_pix + dy)) * edge_len + (x_pix + dx))] = 255;
       }
     }
   }
-  ROS_INFO("Got past image-building loop");
 
   cv::Mat blk(edge_len, edge_len, CV_8UC1, &data);
   // cv::imshow("Black and white", blk);
@@ -102,14 +104,12 @@ bool detect_walls(cv::Mat blk) {
         cv::Scalar(0, 255, 0), 4, CV_AA);
   cv::line(clr, cv::Point(cen_x, cen_y - k), cv::Point(cen_x - k, cen_y + k),
         cv::Scalar(0, 255, 0), 4, CV_AA);
-  ROS_INFO("Drew the bot");
 
   // Detect lines in the image
   std::vector<cv::Vec4i> lines;
   // src, lines, res (pix), res (rad), points_in_line, minLinLength, maxLineGap
   cv::HoughLinesP(blk, lines, 1, CV_PI/180, 50, 100, 80);
   ROS_INFO("\tNumber of lines detected: %d", lines.size());
-  ROS_INFO("Did the Hough transform");
 
   std::vector<float> ang, length, nearest_dist;
   bool behind_bot[lines.size()];
@@ -158,14 +158,13 @@ bool detect_walls(cv::Mat blk) {
     // ROS_INFO("\tline %d - slope: %f", i, m);
     // ROS_INFO("\tline %d - y intercept: %f", i, b);
     // ROS_INFO("\tline %d - nearest_dist (m): %f", i, nearest_dist.at(i));
-    ROS_INFO("\tDoes wall cross behind robot? %d", behind_bot[i]);
+    // ROS_INFO("\tDoes wall cross behind robot? %d", behind_bot[i]);
 
     if (length.at(i) > max_len) {
       max_len = length.at(i);
       max_i = i;
     }
   }
-  ROS_INFO("Calculated all the useful data");
 
   cv::imshow("Added lines", clr);
   cv::waitKey(10);
