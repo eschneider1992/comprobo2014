@@ -1,0 +1,6 @@
+<launch>
+  <!-- Map server -->
+  <node pkg="tf" type="static_transform_publisher" name="map_to_odom"
+    args="0 0 0 0 0 0 odom map 50" />
+  <node pkg="occupancygrid_mapping" name="mapper" type="create_map.py" output="screen"/>
+</launch>
