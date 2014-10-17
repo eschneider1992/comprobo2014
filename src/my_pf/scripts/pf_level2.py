@@ -6,6 +6,7 @@ from std_msgs.msg import Header, String
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, PoseArray, Pose, Point, Quaternion
 from nav_msgs.srv import GetMap
+from copy import deepcopy
 
 import tf
 from tf import TransformListener
@@ -268,7 +269,7 @@ class ParticleFilter:
 		inds = values[np.digitize(random_sample(n), bins)]
 		samples = []
 		for i in inds:
-			samples.append(choices[int(i)])
+			samples.append(deepcopy(choices[int(i)]))
 		return samples
 
 	def update_initial_pose(self, msg):
