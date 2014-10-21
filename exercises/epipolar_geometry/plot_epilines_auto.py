@@ -2,6 +2,9 @@ import cv2
 import pickle
 import numpy as np
 
+ratio_threshold = 0.7
+corner_threshold = 0.02
+
 D = np.array( [0.08683, -0.28966000000000003, -0.00045000000000000004, -0.00015000000000000001, 0.0])
 K = np.array( [[651.38582, 0.0, 327.26766], [0.0, 650.2441, 242.38098],[ 0.0, 0.0, 1.0]])
 W = np.array([[0.0, -1.0, 0.0],
@@ -90,25 +93,31 @@ if __name__ == '__main__':
 		dc, des2 = extractor.compute(im2_bw,kp2)
 
 		matches = matcher.knnMatch(des1,des2,k=2)
+		matches_reversed = matcher.knnMatch(des2,des1,k=2)
+
+		good_matches_prelim = []
+		for m,n in matches:
+			if m.distance < ratio_threshold*n.distance and kp1[m.queryIdx].response > corner_threshold and kp2[m.trainIdx].response > corner_threshold:
+				good_matches_prelim.append((m.queryIdx, m.trainIdx))
 
 		good_matches = []
-		for m,n in matches:
-			if m.distance < 0.7*n.distance and kp1[m.queryIdx].response > 0.02 and kp2[m.trainIdx].response > 0.02:
-				good_matches.append((m.queryIdx, m.trainIdx))
+		for m,n in matches_reversed:
+			if m.distance < ratio_threshold*n.distance and (m.trainIdx,m.queryIdx) in good_matches_prelim:
+				good_matches.append((m.trainIdx, m.queryIdx))
 
-			auto_pts1 = np.zeros((1,len(good_matches),2))
-			auto_pts2 = np.zeros((1,len(good_matches),2))
+		auto_pts1 = np.zeros((1,len(good_matches),2))
+		auto_pts2 = np.zeros((1,len(good_matches),2))
 
-			for idx in range(len(good_matches)):
-				match = good_matches[idx]
-				auto_pts1[0,idx,:] = kp1[match[0]].pt
-				auto_pts2[0,idx,:] = kp2[match[1]].pt
+		for idx in range(len(good_matches)):
+			match = good_matches[idx]
+			auto_pts1[0,idx,:] = kp1[match[0]].pt
+			auto_pts2[0,idx,:] = kp2[match[1]].pt
 
-			auto_pts1_orig = auto_pts1
-			auto_pts2_orig = auto_pts2
+		auto_pts1_orig = auto_pts1
+		auto_pts2_orig = auto_pts2
 
-			auto_pts1 = cv2.undistortPoints(auto_pts1, K, D)
-			auto_pts2 = cv2.undistortPoints(auto_pts2, K, D)
+		auto_pts1 = cv2.undistortPoints(auto_pts1, K, D)
+		auto_pts2 = cv2.undistortPoints(auto_pts2, K, D)
 
 	f = open('correspondences.pickle','r')
 	correspondences = pickle.load(f)
@@ -145,7 +154,7 @@ if __name__ == '__main__':
 	im1_pts_ud = cv2.undistortPoints(im1_pts_augmented,K,D)
 	im2_pts_ud = cv2.undistortPoints(im2_pts_augmented,K,D)
 
-	E, mask = cv2.findFundamentalMat(im1_pts_ud,im2_pts_ud,cv2.FM_RANSAC,10**-3)
+	E, mask = cv2.findFundamentalMat(im1_pts_ud,im2_pts_ud,cv2.FM_RANSAC,0.5*10**-3)
 
 	im1_pts_ud_fixed, im2_pts_ud_fixed = cv2.correctMatches(E, im1_pts_ud, im2_pts_ud)
 	use_corrected_matches = True
