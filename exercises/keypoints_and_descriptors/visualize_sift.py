@@ -71,4 +71,6 @@ if __name__ == '__main__':
 
 	while True:
 		cv2.imshow("mywin", np.hstack((cv2.resize(im,visualizer_size),V)))
-		cv2.waitKey(25)
+		k = cv2.waitKey(25)
+		if k & 0xFF == ord('q'):
+			break
