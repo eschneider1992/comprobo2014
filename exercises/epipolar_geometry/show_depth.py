@@ -1,9 +1,8 @@
+#!/usr/bin/env python
+
 import cv2
 import pickle
 import numpy as np
-
-ratio_threshold = 0.7
-corner_threshold = 0.02
 
 D = np.array( [0.08683, -0.28966000000000003, -0.00045000000000000004, -0.00015000000000000001, 0.0])
 K = np.array( [[651.38582, 0.0, 327.26766], [0.0, 650.2441, 242.38098],[ 0.0, 0.0, 1.0]])
@@ -74,65 +73,14 @@ if __name__ == '__main__':
 	im1 = cv2.imread('frame0000.jpg')
 	im2 = cv2.imread('frame0001.jpg')
 
-	extract_automatic_matches = True
-	add_in_auto_to_compute_E = True
-	only_use_automatic_matches = True
-
-	if extract_automatic_matches:
-		detector = cv2.FeatureDetector_create('SIFT')
-		extractor = cv2.DescriptorExtractor_create('SIFT')
-		matcher = cv2.BFMatcher()
-
-		im1_bw = cv2.cvtColor(im1,cv2.COLOR_BGR2GRAY)
-		im2_bw = cv2.cvtColor(im2,cv2.COLOR_BGR2GRAY)
-
-		kp1 = detector.detect(im1_bw)
-		kp2 = detector.detect(im2_bw)
-
-		dc, des1 = extractor.compute(im1_bw,kp1)
-		dc, des2 = extractor.compute(im2_bw,kp2)
-
-		matches = matcher.knnMatch(des1,des2,k=2)
-		matches_reversed = matcher.knnMatch(des2,des1,k=2)
-
-		good_matches_prelim = []
-		for m,n in matches:
-			if m.distance < ratio_threshold*n.distance and kp1[m.queryIdx].response > corner_threshold and kp2[m.trainIdx].response > corner_threshold:
-				good_matches_prelim.append((m.queryIdx, m.trainIdx))
-
-		good_matches = []
-		for m,n in matches_reversed:
-			if m.distance < ratio_threshold*n.distance and (m.trainIdx,m.queryIdx) in good_matches_prelim:
-				good_matches.append((m.trainIdx, m.queryIdx))
-
-		auto_pts1 = np.zeros((1,len(good_matches),2))
-		auto_pts2 = np.zeros((1,len(good_matches),2))
-
-		for idx in range(len(good_matches)):
-			match = good_matches[idx]
-			auto_pts1[0,idx,:] = kp1[match[0]].pt
-			auto_pts2[0,idx,:] = kp2[match[1]].pt
-
-		auto_pts1_orig = auto_pts1
-		auto_pts2_orig = auto_pts2
-
-		auto_pts1 = cv2.undistortPoints(auto_pts1, K, D)
-		auto_pts2 = cv2.undistortPoints(auto_pts2, K, D)
-
 	f = open('correspondences.pickle','r')
 	correspondences = pickle.load(f)
 	f.close()
 
-	if only_use_automatic_matches:
-		correspondences = [[],[]]
-
-	if add_in_auto_to_compute_E:
-		for i in range(auto_pts1_orig.shape[1]):
-			correspondences[0].append((auto_pts1_orig[0,i,0],auto_pts1_orig[0,i,1]))
-			correspondences[1].append((auto_pts2_orig[0,i,0],auto_pts2_orig[0,i,1]))
-
 	im1_pts = np.zeros((len(correspondences[0]),2))
 	im2_pts = np.zeros((len(correspondences[1]),2))
+
+	print correspondences
 
 	im = np.array(np.hstack((im1,im2)))
 
@@ -154,7 +102,7 @@ if __name__ == '__main__':
 	im1_pts_ud = cv2.undistortPoints(im1_pts_augmented,K,D)
 	im2_pts_ud = cv2.undistortPoints(im2_pts_augmented,K,D)
 
-	E, mask = cv2.findFundamentalMat(im1_pts_ud,im2_pts_ud,cv2.FM_RANSAC,0.5*10**-3)
+	E, mask = cv2.findFundamentalMat(im1_pts_ud,im2_pts_ud,cv2.FM_RANSAC)
 
 	im1_pts_ud_fixed, im2_pts_ud_fixed = cv2.correctMatches(E, im1_pts_ud, im2_pts_ud)
 	use_corrected_matches = True
@@ -201,22 +149,13 @@ if __name__ == '__main__':
 	for i in range(len(P1_possibilities)):
 		infront_of_camera.append(test_triangulation(P,pclouds[i])+test_triangulation(P1_possibilities[i],pclouds[i]))
 
-	best_pcloud_idx = np.argmax(infront_of_camera)
-	if not(extract_automatic_matches):
-		best_pcloud = pclouds[best_pcloud_idx]
-	else:
-		auto_pts1_fixed, auto_pts2_fixed = cv2.correctMatches(E, auto_pts1, auto_pts2)
-		pcloud_auto = triangulate_points(auto_pts1_fixed, auto_pts2_fixed, P, P1_possibilities[best_pcloud_idx])
-		best_pcloud = np.vstack((pclouds[best_pcloud_idx],pcloud_auto))
-		print auto_pts1_orig[0,:,:].shape
-		im1_pts = np.vstack((im1_pts,auto_pts1_orig[0,:,:]))
-		im2_pts = np.vstack((im2_pts,auto_pts2_orig[0,:,:]))
-
+	best_pcloud = pclouds[np.argmax(infront_of_camera)]
 	depths = best_pcloud[:,2] - min(best_pcloud[:,2])
 	depths = depths / max(depths)
+	print depths
 
 	for i in range(best_pcloud.shape[0]):
-		cv2.circle(im,(int(im1_pts[i,0]),int(im1_pts[i,1])),int(max(1.0,depths[i]*20.0)),(0,depths[i]*255,0),1)
+		cv2.circle(im,(int(im1_pts[i,0]),int(im1_pts[i,1])),int(max(1.0,depths[i]*20.0)),(0,255,0),1)
 
 	cv2.imshow("MYWIN",im)
 	cv2.setMouseCallback("MYWIN",mouse_event,im)

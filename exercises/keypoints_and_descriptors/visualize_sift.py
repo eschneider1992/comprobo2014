@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import numpy as np
 import cv2
 from math import pi, cos, sin
@@ -6,6 +8,8 @@ drawing = False
 V = None
 visualizer_size = (512,512)
 patch_size = (128,128)
+# we will draw our patch on im
+im =  255*np.ones(patch_size,dtype=np.uint8)
 
 def visualize_descriptor():
 	""" Visualize the current value of the SIFT descriptor """
@@ -43,19 +47,22 @@ def visualize_descriptor():
 
 def mouse_event(event,x,y,flag,dc):
 	global drawing
+	global last_x
+	global last_y
 	if event == cv2.EVENT_LBUTTONDOWN:
 		drawing = True
+		last_x = x
+		last_y = y
 	elif event == cv2.EVENT_LBUTTONUP:
 		drawing = False
 	elif event == cv2.EVENT_MOUSEMOVE and drawing:
-		# draw a 3x3 rectangle when the mouse is held down
-		cv2.rectangle(im,(int(x/(visualizer_size[1]/patch_size[1]))-1,int(y/(visualizer_size[0]/patch_size[0]))-1),(int(x/4.0)+1,int(y/4.0)+1),1,-1)
+		# draw a line between the last mouse position and the current one
+		cv2.line(im,(int(x/(visualizer_size[1]/patch_size[1])),int(y/(visualizer_size[0]/patch_size[0]))),(int(last_x/(visualizer_size[1]/patch_size[1])),int(last_y/(visualizer_size[0]/patch_size[0]))),0,2)
 		visualize_descriptor()
+		last_x = x
+		last_y = y
 
 if __name__ == '__main__':
-	# we will draw our patch on im
-	im = 255*np.ones(patch_size,dtype=np.uint8)
-
 	detector = cv2.FeatureDetector_create('SIFT')
 	extractor = cv2.DescriptorExtractor_create('SIFT')
 
@@ -69,8 +76,12 @@ if __name__ == '__main__':
 	cv2.setMouseCallback("mywin",mouse_event)
 	visualize_descriptor()
 
+	print "Draw on the canvas by clicking and holding the mouse (move slowly)"
+	print "Reset the sketch by pressing the spacebar"
+
 	while True:
 		cv2.imshow("mywin", np.hstack((cv2.resize(im,visualizer_size),V)))
-		k = cv2.waitKey(25)
-		if k & 0xFF == ord('q'):
-			break
+		key = cv2.waitKey(25)
+		if key != -1 and chr(key) == ' ':
+			im =  255*np.ones(patch_size,dtype=np.uint8)
+			visualize_descriptor()

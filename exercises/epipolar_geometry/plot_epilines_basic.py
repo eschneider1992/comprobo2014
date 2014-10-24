@@ -40,11 +40,8 @@ def mouse_event(event,x,y,flag,im):
 if __name__ == '__main__':
 	im1 = cv2.imread('frame0000.jpg')
 	im2 = cv2.imread('frame0001.jpg')
-	if len(sys.argv) < 2:
-		print "USAGE: ./show_depth correspondence-file.pickle"
-		sys.exit(1)
 
-	f = open(sys.argv[1],'r')
+	f = open("correspondences.pickle",'r')
 	correspondences = pickle.load(f)
 	f.close()
 
@@ -59,9 +56,6 @@ if __name__ == '__main__':
 		im1_pts[i,1] = correspondences[0][i][1]
 		im2_pts[i,0] = correspondences[1][i][0]
 		im2_pts[i,1] = correspondences[1][i][1]
-
-		cv2.circle(im,(int(im1_pts[i,0]),int(im1_pts[i,1])),2,(255,0,0),2)
-		cv2.circle(im,(int(im2_pts[i,0]+im1.shape[1]),int(im2_pts[i,1])),2,(255,0,0),2)
 
 	im1_pts_augmented = np.zeros((1,im1_pts.shape[0],im1_pts.shape[1]))
 	im1_pts_augmented[0,:,:] = im1_pts

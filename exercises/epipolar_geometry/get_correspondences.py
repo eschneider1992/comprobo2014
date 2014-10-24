@@ -1,6 +1,9 @@
+#!/usr/bin/env python
+
 import cv2
 import pickle
 import numpy as np
+import sys
 
 colors = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255)]
 scale_factor = 2.0
@@ -23,6 +26,14 @@ def mouse_event(event,x,y,flag,im):
 		pt_num += 1
 
 if __name__ == '__main__':
+	if len(sys.argv) < 2:
+		print "USAGE: ./get_correspondences.py correspondence-file.pickle [num_correspondences]"
+		sys.exit(1)
+	if len(sys.argv) < 3:
+		n_correspondences = 8
+	else:
+		n_correspondences = int(sys.argv[2])
+
 	im1 = cv2.imread('frame0000.jpg')
 	im2 = cv2.imread('frame0001.jpg')
 	im1 = cv2.resize(im1,(int(im1.shape[1]*scale_factor),int(im1.shape[0]*scale_factor)))
@@ -32,10 +43,11 @@ if __name__ == '__main__':
 	cv2.imshow("MYWIN",im)
 	cv2.setMouseCallback("MYWIN",mouse_event,im)
 	while True:
-		if len(im2_pts) >= 12:
+		if len(im2_pts) >= n_correspondences:
 			break
 		cv2.waitKey(50)
-	f = open('correspondences.pickle','wb')
+
+	f = open(sys.argv[1],'wb')
 	pickle.dump((im1_pts,im2_pts),f)
 	f.close()
 	cv2.destroyAllWindows()
